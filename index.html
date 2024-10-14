@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vue 文件拖转上传</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+   .dropzone {
+      border: 2px dashed #ccc;
+      width: 300px;
+      height: 200px;
+      text-align: center;
+      line-height: 200px;
+      font-size: 18px;
+      margin: auto;
+    }
+
+   .progress-bar {
+      height: 20px;
+      border: 1px solid #ccc;
+    }
+
+   .progress-bar div {
+      height: 100%;
+      background-color: green;
+      text-align: center;
+      line-height: 20px;
+      color: white;
+    }
+
+   .download-info {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      text-align: center;
+    }
+
+    a {
+      cursor: pointer;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <div class="dropzone" v-if="!file" @dragover.prevent @dragenter.prevent @drop="onDrop">
+      把文件拖到到此
+    </div>
+    <div v-if="file">
+      已选择文件：{{ file.name }}
+      <button @click="uploadFile">立即上传</button>
+      <div class="progress-bar" v-if="uploadInProgress">
+        <div :style="{ width: uploadProgress + '%' }">{{ uploadProgress }}%</div>
+      </div>
+    </div>
+    <div v-if="downloadInfo" class="download-info">
+      <p>SHA1: {{ downloadInfo.sha1 }}</p>
+      <p>下载地址：<a :href="downloadInfo.url" target="_blank">{{ downloadInfo.url }}</a> <span @click="copyUrl" style="cursor: pointer;">点击复制</span></p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+  <script>
+    const app = Vue.createApp({
+      data() {
+        return {
+          file: null,
+          uploadInProgress: false,
+          uploadProgress: 0,
+          downloadInfo: null
+        };
+      },
+      methods: {
+        onDrop(event) {
+          event.preventDefault();
+          this.file = event.dataTransfer.files[0];
+        },
+        async uploadFile() {
+          if (!this.file) {
+            alert('请先选择文件');
+            return;
+          }
+          this.uploadInProgress = true;
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', `${window.location.protocol}//${window.location.host}/upload`);
+          xhr.upload.addEventListener('progress', (event) => {
+            if (event.lengthComputable) {
+              this.uploadProgress = Math.round((event.loaded / event.total) * 100);
+            }
+          });
+          const formData = new FormData();
+          formData.append('file', this.file);
+          xhr.send(formData);
+          xhr.onload = () => {
+            if (xhr.status === 200) {
+              const data = JSON.parse(xhr.responseText);
+              this.downloadInfo = {
+                sha1: data.sha1,
+                url: data.url
+              };
+              this.file = null;
+              this.uploadInProgress = false;
+            } else {
+              this.uploadInProgress = false;
+              alert(`文件上传失败，状态码：${xhr.status}`);
+            }
+          };
+        },
+        copyUrl() {
+          const textarea = document.createElement('textarea');
+          textarea.value = this.downloadInfo.url;
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textarea);
+          alert('下载地址已复制到剪贴板！');
+        }
+      }
+    });
+    app.mount('#app');
+  </script>
+</body>
+
+</html>
